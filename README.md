@@ -5,7 +5,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
-| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP and PSA 10 comp prices |
+| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and a deal check against the stream price |
 
 ## Installing a script
 
@@ -46,8 +46,21 @@ On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in 
 
 1. Grabs the current video frame at full resolution.
 2. Sends it to Pulse's card scanner, the same one behind the scan page on pulsetcg.io.
-3. Fetches market prices for the matches and shows the top one: name, set, number, language and variant, then NM, LP, MP and HP prices for the raw card and the PSA 10 price, each with its last sale date. A `*` marks prices with few recent sales.
-4. Adds an **Open on Pulse** link to the card's page, and lists other cards it found in the frame. Click one to switch to it.
+3. Shows the top match's name, set, number, language, variant and edition (such as 1st Edition), then a table with a row each for NM, LP, MP, HP and PSA 10:
+   - **Pulse:** Pulse's market price and its last sale date. A `*` marks prices with few recent sales.
+   - **UK last** and **US last:** the most recent eBay sale in that grade on ebay.co.uk and ebay.com, with its date. Click one to open the sold listing.
+4. Runs a **deal check**: what the stream's current listing costs you against the Pulse price and the last UK and US sales, as an amount and a percentage under or over.
+5. Lists the last 3 UK and 3 US sales for the chosen grade under **Recent eBay sales**.
+6. Adds an **Open on Pulse** link to the card's page, and lists the scanner's **other matches**: other cards in view, or other printings of the same card. Click one to switch to it.
+
+Every price is in GBP. UK sales are already in pounds, and US sales use Pulse's own dollar-to-pound conversion.
+
+The deal check's cost depends on the seller's currency:
+
+- **Yen:** the post-fees total from whatnot-landed-cost's badge, which includes shipping, VAT, duty and the customs fee. Without that script it says so instead of guessing.
+- **Pounds:** the price plus the shipping chip.
+
+It compares against the grade on the listing's condition line ("Near Mint" compares with NM), or PSA 10 when the title says PSA 10, and falls back to NM. Click a row's label or Pulse price to compare against another grade. The check follows the stream price as bids come in.
 
 It uses your Pulse login, so sign in to pulsetcg.io in the same browser first. On the first scan Tampermonkey asks whether the script may connect to `pulsetcg.io`; choose **Always allow domain**.
 
@@ -55,5 +68,5 @@ Caveats:
 
 - It calls Pulse's private web API, the one pulsetcg.io's own pages use. Pulse can change it without notice, which would break the script.
 - Pulse may log each scan in your scan history, as it does for scans made on the site.
-- The scanner reads every card in view, including ones on the seller's mat or shelf, and ranks them by confidence, so the top match is sometimes the wrong card. Scan when the card fills the shot, or pick it from "Also in frame".
-- It has no separate check for 1st edition. Check the set and variant line against the card on screen before trusting the price.
+- The scanner reads every card in view, including ones on the seller's mat or shelf, and ranks them by confidence, so the top match is sometimes the wrong card. Scan when the card fills the shot, or pick it from the other matches.
+- The scanner can return a card's 1st Edition and Unlimited printings as separate matches with different prices. The edition shows in each match's description; check it against the stamp on the card.
