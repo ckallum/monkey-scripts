@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Whatnot Pulse comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.2.2
+// @version      1.2.3
 // @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
@@ -694,17 +694,18 @@
       priceGrid(prices, sales, grade),
       el('div', { ...MUTED, fontSize: '10px' }, `All GBP ${DOT} UK/US: last eBay sale ${DOT} * few recent sales ${DOT} click a row to compare`),
       dealSection(prices, sales, grade),
-      recentSalesSection(sales, grade),
     );
 
     const slug = state.slugs[match.product_id];
     if (slug) {
-      const link = el('a', { display: 'inline-block', marginTop: '4px', color: GREEN, fontSize: '12px' }, 'Open on Pulse');
+      const link = el('a', { display: 'inline-block', marginTop: '6px', color: GREEN, fontSize: '12px' }, 'Open on Pulse');
       link.href = `${PULSE}/cards/${encodeURIComponent(slug)}`;
       link.target = '_blank';
       link.rel = 'noopener';
       box.append(el('div', null), link);
     }
+
+    box.append(recentSalesSection(sales, grade));
 
     if (state.matches.length > 1) {
       const { toggle, open } = sectionToggle('matchesOpen', `Other matches (${state.matches.length - 1})`);

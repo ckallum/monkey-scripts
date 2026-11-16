@@ -50,8 +50,8 @@ On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in 
    - **Pulse:** Pulse's market price and its last sale date. A `*` marks prices with few recent sales.
    - **UK last** and **US last:** the most recent eBay sale in that grade on ebay.co.uk and ebay.com, with its date. Click one to open the sold listing.
 4. Runs a **deal check**: what the stream's current listing costs you against the Pulse price and the last UK and US sales, as an amount and a percentage under or over.
-5. Lists the last 3 UK and 3 US sales for the chosen grade under **Recent eBay sales**.
-6. Adds an **Open on Pulse** link to the card's page, and lists the scanner's **other matches** in a collapsed section: other cards in view, or other printings of the same card. Click one to switch to it.
+5. Adds an **Open on Pulse** link to the card's page.
+6. Below that, two collapsed sections: **Recent eBay sales** lists the last 3 UK and 3 US sales for the chosen grade, and **Other matches** lists the scanner's other guesses (other cards in view, or other printings of the same card). Click a match to switch to it.
 
 Every price is in GBP. UK sales are already in pounds, and US sales use Pulse's own dollar-to-pound conversion.
 
