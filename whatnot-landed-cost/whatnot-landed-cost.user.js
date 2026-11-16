@@ -1,9 +1,13 @@
 // ==UserScript==
 // @name         Whatnot UK landed cost (JPY sellers)
 // @namespace    https://ckallum.com/userscripts
-// @version      1.1.1
+// @version      1.1.2
 // @description  Shows the post-fees UK price (item + VAT + customs duty + customs fee) next to every JPY price on Whatnot, plus a quick yen calculator. Duty and VAT rates refresh daily from the UK Trade Tariff API.
 // @author       Callum Ke
+// @homepageURL  https://github.com/ckallum/monkey-scripts
+// @supportURL   https://github.com/ckallum/monkey-scripts/issues
+// @updateURL    https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-landed-cost/whatnot-landed-cost.user.js
+// @downloadURL  https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-landed-cost/whatnot-landed-cost.user.js
 // @match        https://www.whatnot.com/*
 // @grant        GM_getValue
 // @grant        GM_setValue

@@ -8,10 +8,10 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 
 ## Installing a script
 
-1. In Tampermonkey, choose **Create a new script**, select everything in the editor, paste the `.user.js` file over it, and save.
+1. Open the script's raw file in a browser with Tampermonkey, for example [whatnot-landed-cost.user.js](https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-landed-cost/whatnot-landed-cost.user.js). Tampermonkey shows an install page; click **Install**.
 2. In Chromium browsers, open `chrome://extensions`, then Tampermonkey's **Details**. Turn on **Allow User Scripts** and set **Site access** to **On all sites**. Without both, no script runs.
 
-The repo is private, so Tampermonkey can't fetch updates from it. To update a script, paste the new version over the old one.
+Tampermonkey then keeps the script updated: it checks the header's `@updateURL` (daily by default) and installs any higher `@version`. Pasting the file into **Create a new script** works too, and the pasted copy updates the same way as long as its header keeps the `@updateURL`.
 
 ## Tests
 
@@ -20,6 +20,7 @@ The repo is private, so Tampermonkey can't fetch updates from it. To update a sc
 ## Conventions
 
 - Keep script sources pure ASCII and write currency signs as escapes, such as `\u00A3` for the pound sign. A clipboard copy in the wrong encoding once turned every `£` into `¬£`, and the price matching broke without any error. Each script's tests check for this.
+- Bump `@version` in every change you want installed copies to pick up; Tampermonkey ignores updates that don't raise it.
 - Export the pure helpers through `module.exports` behind a `typeof module` guard, so tests can `require` a script without a browser.
 
 ## whatnot-landed-cost
