@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Whatnot Pulse comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.2.3
+// @version      1.2.4
 // @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
@@ -451,7 +451,7 @@
       userSelect: 'none',
       touchAction: 'none',
     });
-    const title = el('span', null, 'Pulse comps');
+    const title = el('span', null, 'Comps');
     const toggle = el('button', { background: 'none', border: 'none', color: 'inherit', font: `700 14px/1 ${FONT}`, cursor: 'pointer', padding: '0 2px' });
     toggle.type = 'button';
     header.append(title, toggle);

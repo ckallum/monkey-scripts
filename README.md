@@ -42,7 +42,7 @@ The Tampermonkey menu can refresh the rates, set the fee %, a fallback shipping 
 
 ## whatnot-pulse-comps
 
-On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Pulse comps" panel. The script:
+On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Comps" panel. The script:
 
 1. Grabs the current video frame at full resolution.
 2. Sends it to Pulse's card scanner, the same one behind the scan page on pulsetcg.io.
