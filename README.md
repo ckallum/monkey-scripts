@@ -4,7 +4,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 
 | Script | Site | What it does |
 |---|---|---|
-| [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the all-in UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
+| [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
 
 ## Installing a script
 

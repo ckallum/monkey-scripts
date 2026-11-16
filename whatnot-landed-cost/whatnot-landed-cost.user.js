@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Whatnot UK landed cost (JPY sellers)
 // @namespace    https://ckallum.com/userscripts
-// @version      1.1.0
-// @description  Shows the all-in UK price (item + VAT + customs duty + customs fee) next to every JPY price on Whatnot, plus a quick yen calculator. Duty and VAT rates refresh daily from the UK Trade Tariff API.
+// @version      1.1.1
+// @description  Shows the post-fees UK price (item + VAT + customs duty + customs fee) next to every JPY price on Whatnot, plus a quick yen calculator. Duty and VAT rates refresh daily from the UK Trade Tariff API.
 // @author       Callum Ke
 // @match        https://www.whatnot.com/*
 // @grant        GM_getValue
@@ -183,7 +183,7 @@
 
   function tooltip(r, gbpPerJpy) {
     const checked = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleDateString('en-GB') : 'never (offline defaults)';
-    const lines = [`All-in estimate for ${yen(r.price)}`, `Item: ${yen(r.price)}`];
+    const lines = [`Post fees estimate for ${yen(r.price)}`, `Item: ${yen(r.price)}`];
     if (r.shipping) lines.push(`Shipping: ${yen(r.shipping)}`);
     if (r.lowValue) {
       lines.push(`VAT ${rates.vatPct}%: ${yen(r.vat)}`, `Under ${POUND}${settings.lowValueThresholdGbp}: VAT only, no duty or customs fee`);
@@ -297,7 +297,7 @@
 
     for (const { est, priceJpy } of pairs) {
       const r = computeLanded(priceJpy, gbpPerJpy, rates, settings);
-      const text = `all-in ${yen(r.total)} \u00B7 ${gbp(r.totalGbp)}`;
+      const text = `Post fees ${yen(r.total)} \u00B7 ${gbp(r.totalGbp)}`;
       const anchor = badgeAnchor(est);
 
       let wrap = badgeFor.get(est);
@@ -344,7 +344,7 @@
   // ---------- Calculator ----------
 
   /**
-   * Floating box where you type a yen amount and see the all-in total as you type.
+   * Floating box where you type a yen amount and see the post-fees total as you type.
    * - Shown while the page has JPY prices; uses the same rates and Whatnot FX as the badges.
    * - Attached to <body>, not Whatnot's overlay, so it survives item changes and React re-renders.
    * - Drag by the header; position and collapsed state persist across pages.
@@ -383,7 +383,7 @@
       touchAction: 'none',
     });
     const title = document.createElement('span');
-    title.textContent = `${YEN} all-in calculator`;
+    title.textContent = `${YEN} Post fees calculator`;
     const toggle = document.createElement('button');
     toggle.type = 'button';
     Object.assign(toggle.style, { background: 'none', border: 'none', color: 'inherit', font: '700 14px/1 system-ui, sans-serif', cursor: 'pointer', padding: '0 2px' });
