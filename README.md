@@ -5,6 +5,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
+| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP comp prices |
 
 ## Installing a script
 
@@ -38,3 +39,21 @@ The fee percentage matches two receipts. ¥34,800 came to exactly ¥43,375, line
 Items whose goods are worth £135 or less (shipping doesn't count towards this) get VAT only, under the UK low-value rule. That part hasn't been checked against a real receipt yet. If a cheap item's receipt shows duty or a customs fee, turn the rule off from the menu.
 
 The Tampermonkey menu can refresh the rates, set the fee %, a fallback shipping amount for streams with no shipping chip, and the commodity code, toggle the £135 rule, and reset the calculator's position.
+
+## whatnot-pulse-comps
+
+On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Pulse comps" panel. The script:
+
+1. Grabs the current video frame at full resolution.
+2. Sends it to Pulse's card scanner, the same one behind the scan page on pulsetcg.io.
+3. Fetches market prices for the matches and shows the top one: name, set, number, language and variant, then NM, LP, MP and HP prices with each one's last sale date. A `*` marks prices with few recent sales.
+4. Adds an **Open on Pulse** link to the card's page, and lists other cards it found in the frame. Click one to switch to it.
+
+It uses your Pulse login, so sign in to pulsetcg.io in the same browser first. On the first scan Tampermonkey asks whether the script may connect to `pulsetcg.io`; choose **Always allow domain**.
+
+Caveats:
+
+- It calls Pulse's private web API, the one pulsetcg.io's own pages use. Pulse can change it without notice, which would break the script.
+- Pulse may log each scan in your scan history, as it does for scans made on the site.
+- The scanner reads every card in view, including ones on the seller's mat or shelf, and ranks them by confidence, so the top match is sometimes the wrong card. Scan when the card fills the shot, or pick it from "Also in frame".
+- It has no separate check for 1st edition. Check the set and variant line against the card on screen before trusting the price.
