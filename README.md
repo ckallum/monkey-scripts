@@ -27,13 +27,14 @@ Tampermonkey then keeps the script updated: it checks the header's `@updateURL` 
 
 The badge and the calculator both estimate what Whatnot charges a UK buyer for an item from a Japanese seller:
 
-- **Duty:** 2%, the UK third-country rate for commodity 9504 40 00 00 (playing cards). The UK–Japan 0% preference is ignored because Whatnot charged 2%.
-- **VAT:** 20% of item + duty.
+- **Shipping:** read from the stream's shipping chip (e.g. `JP¥3,380 (est. £15.99) Shipping`). Weekly Bundling ships later wins from the same seller free, so the calculator has a tick box per seller: untick it after your first win and shipping drops out for 7 days.
+- **Duty:** 2% of item + shipping, the UK third-country rate for commodity 9504 40 00 00 (playing cards). The UK–Japan 0% preference is ignored because Whatnot charged 2%.
+- **VAT:** 20% of item + shipping + duty.
 - **Customs fee:** 10% of duty + VAT.
 - Duty and VAT come from the UK Trade Tariff API and refresh once a day. Pounds use Whatnot's own `est. £` rate from the page.
 
 The fee percentage matches two receipts. ¥34,800 came to exactly ¥43,375, line for line. ¥59,900 came to ¥74,661, where the script gives ¥74,660.
 
-Items worth £135 or less get VAT only, under the UK low-value rule. That part hasn't been checked against a real receipt yet. If a cheap item's receipt shows duty or a customs fee, turn the rule off from the menu.
+Items whose goods are worth £135 or less (shipping doesn't count towards this) get VAT only, under the UK low-value rule. That part hasn't been checked against a real receipt yet. If a cheap item's receipt shows duty or a customs fee, turn the rule off from the menu.
 
-The Tampermonkey menu can refresh the rates, set the fee %, shipping and commodity code, toggle the £135 rule, and reset the calculator's position.
+The Tampermonkey menu can refresh the rates, set the fee %, a fallback shipping amount for streams with no shipping chip, and the commodity code, toggle the £135 rule, and reset the calculator's position.

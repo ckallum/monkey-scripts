@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Whatnot UK landed cost (JPY sellers)
 // @namespace    https://ckallum.com/userscripts
-// @version      1.2.0
+// @version      1.3.0
 // @description  Shows the post-fees UK price (item + VAT + customs duty + customs fee) next to every JPY price on Whatnot, plus a quick yen calculator. Duty and VAT rates refresh daily from the UK Trade Tariff API.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
@@ -41,7 +41,7 @@
     minCustomsFeeJpy: 0,
     lowValueThresholdGbp: 135, // UK consignment threshold: at or below it, VAT only, no duty or clearance fee
     applyLowValueRule: true,
-    shippingJpy: 0, // added to the customs value; most JP sellers on Whatnot ship free
+    shippingJpy: 0, // fallback when the stream shows no shipping chip
   };
 
   const FALLBACK_RATES = { dutyPct: 2, vatPct: 20, source: 'built-in defaults', fetchedAt: 0 };
@@ -81,6 +81,18 @@
   }
 
   /**
+   * Parse the stream's shipping chip into yen.
+   * - "<flag> JP<yen>3,380 (est. <pound>15.99) Shipping" gives 3380; "FREE Shipping" gives 0.
+   * - Returns null for anything else, e.g. "Ships FedEx IP".
+   */
+  function parseShippingChip(text) {
+    const t = String(text || '').trim();
+    if (/^free shipping$/i.test(t)) return 0;
+    const m = t.match(/(?:JP)?[\u00A5\uFFE5]\s?([\d,]+)\s*\(est\.[^)]*\)\s*Shipping$/i);
+    return m ? Number(m[1].replace(/,/g, '')) : null;
+  }
+
+  /**
    * Extract MFN duty % and VAT % from a Trade Tariff commodity response.
    * Returns { dutyPct, vatPct }; a field is null when the tariff has no ad-valorem rate for it.
    */
@@ -109,17 +121,19 @@
   /**
    * Estimate what Whatnot charges a UK buyer for a JPY item.
    * - Amounts are whole yen, rounded per line like Whatnot's receipt.
-   * - VAT is charged on (item + shipping + duty); the customs fee is a % of (duty + VAT).
+   * - Duty and VAT apply to item + shipping (shipping is part of the UK customs value).
+   * - The low-value threshold compares the goods alone; UK rules exclude shipping from it.
+   * - The customs fee is a % of (duty + VAT).
    * @param {number} priceJpy  item price in yen
    * @param {number} gbpPerJpy pounds per yen, used for the low-value threshold and the GBP total
    * @param {{dutyPct:number, vatPct:number}} rates
    * @param {typeof DEFAULT_SETTINGS} settings
+   * @param {number} [shippingJpy] shipping in yen; defaults to the settings fallback
    * @returns {{price:number, shipping:number, duty:number, vat:number, fee:number, total:number, totalGbp:number, lowValue:boolean}}
    */
-  function computeLanded(priceJpy, gbpPerJpy, rates, settings) {
-    const shipping = settings.shippingJpy || 0;
-    const valueGbp = (priceJpy + shipping) * gbpPerJpy;
-    const lowValue = Boolean(settings.applyLowValueRule) && valueGbp <= settings.lowValueThresholdGbp;
+  function computeLanded(priceJpy, gbpPerJpy, rates, settings, shippingJpy = settings.shippingJpy || 0) {
+    const shipping = shippingJpy;
+    const lowValue = Boolean(settings.applyLowValueRule) && priceJpy * gbpPerJpy <= settings.lowValueThresholdGbp;
     const duty = lowValue ? 0 : Math.round((priceJpy + shipping) * rates.dutyPct / 100);
     const vat = Math.round((priceJpy + shipping + duty) * rates.vatPct / 100);
     const fee = lowValue ? 0 : Math.max(settings.minCustomsFeeJpy || 0, Math.round((duty + vat) * settings.customsFeePct / 100));
@@ -128,7 +142,7 @@
   }
 
   if (typeof module === 'object' && module.exports) {
-    module.exports = { parseYen, parseEstGbp, parseJpyInput, parseTariff, computeLanded, DEFAULT_SETTINGS };
+    module.exports = { parseYen, parseEstGbp, parseJpyInput, parseShippingChip, parseTariff, computeLanded, DEFAULT_SETTINGS };
     return;
   }
 
@@ -180,6 +194,57 @@
     }
   }
 
+  // ---------- Shipping and weekly bundling ----------
+
+  // Whatnot's Weekly Bundling ships later wins from the same seller free, so a seller marked bundled stays free this long.
+  const BUNDLE_MS = 7 * DAY_MS;
+  let shippingSeen = null; // { seller, jpy } from the last shipping chip, kept while the stream is between items
+
+  /** The live seller's username, from the "<seller> is live" page title; null off live pages. */
+  function currentSeller() {
+    const m = document.title.match(/^(\S+) is live\b/);
+    return m ? m[1] : null;
+  }
+
+  function isBundled(seller) {
+    const until = GM_getValue('bundled', {})[seller];
+    return Boolean(until && until > Date.now());
+  }
+
+  function setBundled(seller, bundled) {
+    const all = GM_getValue('bundled', {});
+    for (const [name, until] of Object.entries(all)) if (until <= Date.now()) delete all[name];
+    if (bundled) all[seller] = Date.now() + BUNDLE_MS;
+    else delete all[seller];
+    GM_setValue('bundled', all);
+  }
+
+  function updateListingShipping() {
+    const seller = currentSeller();
+    const snap = document.evaluate("//body//text()[contains(., 'Shipping')]/parent::*[not(self::script or self::style)]", document, null, XPathResult.ORDERED_NODE_SNAPSHOT_TYPE, null);
+    for (let i = 0; i < snap.snapshotLength; i++) {
+      const el = snap.snapshotItem(i);
+      if (el.closest('[data-wnl]')) continue;
+      const jpy = parseShippingChip(el.textContent);
+      if (jpy !== null) {
+        shippingSeen = { seller, jpy };
+        return;
+      }
+    }
+  }
+
+  /** The seller's listed shipping: the stream's chip for this seller, else the menu fallback. */
+  function listedShipping() {
+    const seller = currentSeller();
+    return shippingSeen && shippingSeen.seller === seller ? shippingSeen.jpy : settings.shippingJpy || 0;
+  }
+
+  /** Shipping on your next win: free once bundled with this seller, else the listed amount. */
+  function shippingForNextBuy() {
+    const seller = currentSeller();
+    return seller && isBundled(seller) ? 0 : listedShipping();
+  }
+
   // ---------- Rendering ----------
 
   const yen = (n) => `${YEN}${Math.round(n).toLocaleString('en-GB')}`;
@@ -190,6 +255,7 @@
     const checked = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleDateString('en-GB') : 'never (offline defaults)';
     const lines = [`Post fees estimate for ${yen(r.price)}`, `Item: ${yen(r.price)}`];
     if (r.shipping) lines.push(`Shipping: ${yen(r.shipping)}`);
+    else if (listedShipping() > 0) lines.push('Shipping: free (bundled)');
     if (r.lowValue) {
       lines.push(`VAT ${rates.vatPct}%: ${yen(r.vat)}`, `Under ${POUND}${settings.lowValueThresholdGbp}: VAT only, no duty or customs fee`);
     } else {
@@ -273,6 +339,7 @@
   }
 
   function scan() {
+    updateListingShipping();
     for (const [wrap, est] of live) {
       if (!est.isConnected || !wrap.isConnected) {
         wrap.remove();
@@ -299,9 +366,10 @@
     const best = pairs.reduce((a, b) => (b.priceJpy > a.priceJpy ? b : a));
     const gbpPerJpy = best.estGbp / best.priceJpy;
     syncCalculator(gbpPerJpy);
+    const shipping = shippingForNextBuy();
 
     for (const { est, priceJpy } of pairs) {
-      const r = computeLanded(priceJpy, gbpPerJpy, rates, settings);
+      const r = computeLanded(priceJpy, gbpPerJpy, rates, settings, shipping);
       const text = `Post fees ${pair(r.total, r.totalGbp)}`;
       const anchor = badgeAnchor(est);
 
@@ -355,7 +423,7 @@
    * - Drag by the header; position and collapsed state persist across pages.
    */
   const CALC_WIDTH = 230;
-  const calc = { root: null, body: null, input: null, pre: null, post: null, detail: null, gbpPerJpy: null, placed: false };
+  const calc = { root: null, body: null, input: null, shipRow: null, shipBox: null, shipText: null, pre: null, post: null, detail: null, gbpPerJpy: null, placed: false };
 
   function buildCalculator() {
     const root = document.createElement('div');
@@ -410,6 +478,19 @@
       font: '600 14px/1.3 system-ui, -apple-system, sans-serif',
       outline: 'none',
     });
+    const shipRow = document.createElement('label');
+    Object.assign(shipRow.style, { display: 'none', alignItems: 'center', gap: '5px', margin: '0 0 4px', fontSize: '11px', cursor: 'pointer', userSelect: 'none' });
+    const shipBox = document.createElement('input');
+    shipBox.type = 'checkbox';
+    // Explicit appearance, in case the site's form CSS restyles checkboxes.
+    Object.assign(shipBox.style, { appearance: 'auto', webkitAppearance: 'checkbox', width: '13px', height: '13px', margin: '0', accentColor: '#FBBF24', cursor: 'pointer' });
+    const shipText = document.createElement('span');
+    shipRow.append(shipBox, shipText);
+    shipBox.addEventListener('change', () => {
+      const seller = currentSeller();
+      if (seller) setBundled(seller, !shipBox.checked);
+      scheduleScan(true);
+    });
     const row = (label, valueFont) => {
       const el = document.createElement('div');
       Object.assign(el.style, { display: 'flex', alignItems: 'baseline', gap: '6px' });
@@ -426,10 +507,10 @@
     post.value.style.cursor = 'help';
     const detail = document.createElement('div');
     Object.assign(detail.style, { fontSize: '11px', opacity: '0.75', marginTop: '1px' });
-    body.append(input, pre.el, post.el, detail);
+    body.append(input, shipRow, pre.el, post.el, detail);
     root.append(header, body);
     document.body.appendChild(root);
-    Object.assign(calc, { root, body, input, pre: pre.value, post: post.value, detail });
+    Object.assign(calc, { root, body, input, shipRow, shipBox, shipText, pre: pre.value, post: post.value, detail });
 
     // Whatnot listens for keys at page level; keep typing inside the box.
     for (const type of ['keydown', 'keyup', 'keypress']) input.addEventListener(type, (e) => e.stopPropagation());
@@ -491,6 +572,15 @@
 
   function renderCalculator() {
     if (!calc.root) return;
+    const seller = currentSeller();
+    const listed = listedShipping();
+    calc.shipRow.style.display = seller && listed > 0 ? 'flex' : 'none';
+    if (seller && listed > 0) {
+      const bundled = isBundled(seller);
+      calc.shipBox.checked = !bundled;
+      calc.shipText.textContent = bundled ? 'Shipping free (bundled)' : `Shipping ${yen(listed)}`;
+      calc.shipRow.title = `Ticked: shipping is added, as on your first win from ${seller} this week.\nUntick once you've won something: Weekly Bundling ships the rest free. Remembered for 7 days.`;
+    }
     const jpy = parseJpyInput(calc.input.value);
     if (jpy === null || !calc.gbpPerJpy) {
       calc.pre.textContent = '\u2014';
@@ -499,12 +589,15 @@
       calc.detail.textContent = calc.input.value.trim() ? 'Type a yen amount, e.g. 12000 or 12k' : '';
       return;
     }
-    const r = computeLanded(jpy, calc.gbpPerJpy, rates, settings);
+    const r = computeLanded(jpy, calc.gbpPerJpy, rates, settings, shippingForNextBuy());
     calc.pre.textContent = pair(r.price, r.price * calc.gbpPerJpy);
     calc.post.textContent = pair(r.total, r.totalGbp);
-    calc.detail.textContent = r.lowValue
-      ? `+ VAT ${yen(r.vat)} only (under ${POUND}${settings.lowValueThresholdGbp})`
-      : `+ duty ${yen(r.duty)} + VAT ${yen(r.vat)} + fee ${yen(r.fee)}`;
+    const parts = [];
+    if (r.shipping) parts.push(`shipping ${yen(r.shipping)}`);
+    if (!r.lowValue) parts.push(`duty ${yen(r.duty)}`);
+    parts.push(`VAT ${yen(r.vat)}`);
+    if (!r.lowValue) parts.push(`customs fee ${yen(r.fee)}`);
+    calc.detail.textContent = `+ ${parts.join(' + ')}${r.lowValue ? ` (under ${POUND}${settings.lowValueThresholdGbp}: no duty or customs fee)` : ''}`;
     calc.post.title = tooltip(r, calc.gbpPerJpy);
   }
 
@@ -545,8 +638,8 @@
     const n = promptNumber('Customs fee as % of (duty + VAT):', settings.customsFeePct);
     if (n !== null) { settings.customsFeePct = n; saveSettings(); scheduleScan(true); }
   });
-  GM_registerMenuCommand('Set shipping (JPY)', () => {
-    const n = promptNumber('Shipping charged by the seller, in yen:', settings.shippingJpy);
+  GM_registerMenuCommand('Set fallback shipping (JPY)', () => {
+    const n = promptNumber('Shipping in yen, used when the stream shows no shipping price:', settings.shippingJpy);
     if (n !== null) { settings.shippingJpy = n; saveSettings(); scheduleScan(true); }
   });
   GM_registerMenuCommand('Set commodity code', () => {

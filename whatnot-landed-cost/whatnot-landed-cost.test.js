@@ -1,7 +1,7 @@
 // Run with: npm test (from the repo root)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseYen, parseEstGbp, parseJpyInput, parseTariff, computeLanded, DEFAULT_SETTINGS } = require('./whatnot-landed-cost.user.js');
+const { parseYen, parseEstGbp, parseJpyInput, parseShippingChip, parseTariff, computeLanded, DEFAULT_SETTINGS } = require('./whatnot-landed-cost.user.js');
 
 const RATES = { dutyPct: 2, vatPct: 20 };
 const GBP_PER_JPY = 235.97 / 49800; // Whatnot's own est. for a ¥49,800 listing
@@ -25,6 +25,24 @@ test('at or under £135 only VAT is added', () => {
   const r = computeLanded(3400, 16.11 / 3400, RATES, DEFAULT_SETTINGS);
   assert.equal(r.lowValue, true);
   assert.deepEqual([r.duty, r.vat, r.fee, r.total], [0, 680, 0, 4080]);
+});
+
+test('shipping adds to duty and VAT but not to the £135 threshold', () => {
+  const fx = 0.00474;
+  // ¥20,000 of goods (about £95) stays low-value even with ¥10,000 shipping on top.
+  const low = computeLanded(20000, fx, RATES, DEFAULT_SETTINGS, 10000);
+  assert.equal(low.lowValue, true);
+  assert.deepEqual([low.duty, low.vat, low.fee, low.total], [0, 6000, 0, 36000]);
+  const high = computeLanded(34800, fx, RATES, DEFAULT_SETTINGS, 3380);
+  assert.deepEqual([high.duty, high.vat, high.fee, high.total], [764, 7789, 855, 47588]);
+});
+
+test('reads shipping from the stream chip', () => {
+  assert.equal(parseShippingChip('🇯🇵 JP¥3,380 (est. £15.99) Shipping'), 3380);
+  assert.equal(parseShippingChip('¥4,814 (est. £22.78) Shipping'), 4814);
+  assert.equal(parseShippingChip('FREE Shipping'), 0);
+  assert.equal(parseShippingChip('Ships FedEx IP'), null);
+  assert.equal(parseShippingChip('Shipping and Delivery'), null);
 });
 
 test('low-value rule can be switched off', () => {
