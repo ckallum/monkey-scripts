@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Whatnot UK landed cost (JPY sellers)
 // @namespace    https://ckallum.com/userscripts
-// @version      1.1.2
+// @version      1.2.0
 // @description  Shows the post-fees UK price (item + VAT + customs duty + customs fee) next to every JPY price on Whatnot, plus a quick yen calculator. Duty and VAT rates refresh daily from the UK Trade Tariff API.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
@@ -184,6 +184,7 @@
 
   const yen = (n) => `${YEN}${Math.round(n).toLocaleString('en-GB')}`;
   const gbp = (n) => `${POUND}${n.toLocaleString('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const pair = (jpy, pounds) => `${yen(jpy)} \u00B7 ${gbp(pounds)}`;
 
   function tooltip(r, gbpPerJpy) {
     const checked = rates.fetchedAt ? new Date(rates.fetchedAt).toLocaleDateString('en-GB') : 'never (offline defaults)';
@@ -301,7 +302,7 @@
 
     for (const { est, priceJpy } of pairs) {
       const r = computeLanded(priceJpy, gbpPerJpy, rates, settings);
-      const text = `Post fees ${yen(r.total)} \u00B7 ${gbp(r.totalGbp)}`;
+      const text = `Post fees ${pair(r.total, r.totalGbp)}`;
       const anchor = badgeAnchor(est);
 
       let wrap = badgeFor.get(est);
@@ -348,13 +349,13 @@
   // ---------- Calculator ----------
 
   /**
-   * Floating box where you type a yen amount and see the post-fees total as you type.
+   * Floating box where you type a yen amount and see the pre-fee and post-fee totals as you type.
    * - Shown while the page has JPY prices; uses the same rates and Whatnot FX as the badges.
    * - Attached to <body>, not Whatnot's overlay, so it survives item changes and React re-renders.
    * - Drag by the header; position and collapsed state persist across pages.
    */
-  const CALC_WIDTH = 210;
-  const calc = { root: null, body: null, input: null, out: null, detail: null, gbpPerJpy: null, placed: false };
+  const CALC_WIDTH = 230;
+  const calc = { root: null, body: null, input: null, pre: null, post: null, detail: null, gbpPerJpy: null, placed: false };
 
   function buildCalculator() {
     const root = document.createElement('div');
@@ -409,14 +410,26 @@
       font: '600 14px/1.3 system-ui, -apple-system, sans-serif',
       outline: 'none',
     });
-    const out = document.createElement('div');
-    Object.assign(out.style, { font: '700 14px/1.3 system-ui, -apple-system, sans-serif', cursor: 'help' });
+    const row = (label, valueFont) => {
+      const el = document.createElement('div');
+      Object.assign(el.style, { display: 'flex', alignItems: 'baseline', gap: '6px' });
+      const name = document.createElement('span');
+      name.textContent = label;
+      Object.assign(name.style, { flex: '0 0 58px', fontSize: '11px', opacity: '0.75' });
+      const value = document.createElement('span');
+      Object.assign(value.style, { font: valueFont });
+      el.append(name, value);
+      return { el, value };
+    };
+    const pre = row('Pre fees', '500 13px/1.3 system-ui, -apple-system, sans-serif');
+    const post = row('Post fees', '700 14px/1.3 system-ui, -apple-system, sans-serif');
+    post.value.style.cursor = 'help';
     const detail = document.createElement('div');
     Object.assign(detail.style, { fontSize: '11px', opacity: '0.75', marginTop: '1px' });
-    body.append(input, out, detail);
+    body.append(input, pre.el, post.el, detail);
     root.append(header, body);
     document.body.appendChild(root);
-    Object.assign(calc, { root, body, input, out, detail });
+    Object.assign(calc, { root, body, input, pre: pre.value, post: post.value, detail });
 
     // Whatnot listens for keys at page level; keep typing inside the box.
     for (const type of ['keydown', 'keyup', 'keypress']) input.addEventListener(type, (e) => e.stopPropagation());
@@ -480,17 +493,19 @@
     if (!calc.root) return;
     const jpy = parseJpyInput(calc.input.value);
     if (jpy === null || !calc.gbpPerJpy) {
-      calc.out.textContent = calc.input.value.trim() ? 'Type a yen amount' : '\u2014';
-      calc.detail.textContent = '';
-      calc.out.title = '';
+      calc.pre.textContent = '\u2014';
+      calc.post.textContent = '\u2014';
+      calc.post.title = '';
+      calc.detail.textContent = calc.input.value.trim() ? 'Type a yen amount, e.g. 12000 or 12k' : '';
       return;
     }
     const r = computeLanded(jpy, calc.gbpPerJpy, rates, settings);
-    calc.out.textContent = `${yen(r.total)} \u00B7 ${gbp(r.totalGbp)}`;
+    calc.pre.textContent = pair(r.price, r.price * calc.gbpPerJpy);
+    calc.post.textContent = pair(r.total, r.totalGbp);
     calc.detail.textContent = r.lowValue
       ? `+ VAT ${yen(r.vat)} only (under ${POUND}${settings.lowValueThresholdGbp})`
       : `+ duty ${yen(r.duty)} + VAT ${yen(r.vat)} + fee ${yen(r.fee)}`;
-    calc.out.title = tooltip(r, calc.gbpPerJpy);
+    calc.post.title = tooltip(r, calc.gbpPerJpy);
   }
 
   /**
