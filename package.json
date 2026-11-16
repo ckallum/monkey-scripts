@@ -1,0 +1,11 @@
+{
+  "name": "monkey-scripts",
+  "private": true,
+  "description": "Personal Tampermonkey userscripts",
+  "scripts": {
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
