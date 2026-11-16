@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Whatnot Pulse comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.2.1
+// @version      1.2.2
 // @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
@@ -633,16 +633,22 @@
     return wrap;
   }
 
-  function recentSalesSection(sales, grade) {
-    const wrap = el('div', { marginTop: '6px' });
-    const open = GM_getValue('salesOpen', false);
+  /** A section heading that expands and collapses it, remembered under storeKey. Returns { toggle, open }. */
+  function sectionToggle(storeKey, label) {
+    const open = GM_getValue(storeKey, false);
     const toggle = el('button', { background: 'none', border: 'none', color: GREEN, padding: '0', font: `12px/1.4 ${FONT}`, cursor: 'pointer' },
-      `${open ? ARROW_OPEN : ARROW_CLOSED} Recent eBay sales ${DOT} ${GRADE_LABELS[grade]}`);
+      `${open ? ARROW_OPEN : ARROW_CLOSED} ${label}`);
     toggle.type = 'button';
     toggle.addEventListener('click', () => {
-      GM_setValue('salesOpen', !open);
+      GM_setValue(storeKey, !open);
       render();
     });
+    return { toggle, open };
+  }
+
+  function recentSalesSection(sales, grade) {
+    const wrap = el('div', { marginTop: '6px' });
+    const { toggle, open } = sectionToggle('salesOpen', `Recent eBay sales ${DOT} ${GRADE_LABELS[grade]}`);
     wrap.append(toggle);
     if (!open) return wrap;
     if (!sales || sales === 'loading') {
@@ -701,9 +707,11 @@
     }
 
     if (state.matches.length > 1) {
-      const section = el('div', SECTION);
-      section.append(el('div', SECTION_HEAD, 'Other matches'), el('div', { ...MUTED, marginBottom: '3px' }, 'Other cards in view, or other printings of this one'));
-      box.append(section);
+      const { toggle, open } = sectionToggle('matchesOpen', `Other matches (${state.matches.length - 1})`);
+      toggle.title = 'Other cards in view, or other printings of this one';
+      box.append(el('div', { marginTop: '4px' }), toggle);
+      if (!open) return;
+      box.append(el('div', { ...MUTED, marginBottom: '3px' }, 'Other cards in view, or other printings of this one'));
       state.matches.forEach((other, i) => {
         if (i === state.selected) return;
         const nm = state.prices[other.product_id].nm.value;
