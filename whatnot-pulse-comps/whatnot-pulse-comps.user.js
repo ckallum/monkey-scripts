@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Whatnot Pulse comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.0.1
-// @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP comp prices. Needs you signed in to pulsetcg.io in the same browser.
+// @version      1.1.0
+// @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP and PSA 10 comp prices. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
 // @supportURL   https://github.com/ckallum/monkey-scripts/issues
@@ -53,6 +53,29 @@
     return out;
   }
 
+  /** A graded product's price from its market-data entries: { value, lowData, lastSold }, as for one condition. */
+  function parseGradedPrice(entries) {
+    const market = (entries || []).find((e) => e && e.type === 'market_price') || {};
+    return {
+      value: toPrice(market.value),
+      lowData: Boolean(market.low_availability),
+      lastSold: market.last_sold_date ? String(market.last_sold_date).slice(0, 10) : null,
+    };
+  }
+
+  /**
+   * A product id with its grading fields (5th and 6th) replaced.
+   * - withGrade(id, null, null) gives the raw card, withGrade(id, 'PSA', '10') its PSA 10 slab.
+   * - Ids with fewer than six fields are returned unchanged.
+   */
+  function withGrade(productId, grader, grade) {
+    const parts = String(productId || '').split('|');
+    if (parts.length < 6) return productId;
+    parts[4] = grader || 'null';
+    parts[5] = grade || 'null';
+    return parts.join('|');
+  }
+
   /** A positive price from a number or numeric string; null for null, blanks and zero (Pulse's "no data"). */
   function toPrice(raw) {
     if (raw === null || raw === undefined || raw === '') return null;
@@ -77,7 +100,7 @@
   }
 
   if (typeof module === 'object' && module.exports) {
-    module.exports = { parseConditionPrices, variantOf, describeMatch, searchQueryFor };
+    module.exports = { parseConditionPrices, parseGradedPrice, withGrade, variantOf, describeMatch, searchQueryFor };
     return;
   }
 
@@ -143,18 +166,25 @@
     return (result.matches || []).slice(0, MAX_MATCHES);
   }
 
-  /** Condition prices for several products in one request, keyed by product id. */
+  /**
+   * Raw condition prices plus the PSA 10 price for each match, in one request.
+   * - Returns { [match product id]: { nm, lp, mp, hp, psa10 } }.
+   * - Priced from the raw card even when the scanner matched a slab.
+   */
   async function fetchPrices(ids) {
-    const body = await post('/api/internal/market-data', JSON.stringify({ productIds: ids, metrics: ['market_price', 'last_sold_price'] }), {
+    const lookups = ids.map((id) => ({ id, raw: withGrade(id, null, null), psa10: withGrade(id, 'PSA', '10') }));
+    const productIds = [...new Set(lookups.flatMap((l) => [l.raw, l.psa10]))];
+    const body = (await post('/api/internal/market-data', JSON.stringify({ productIds, metrics: ['market_price', 'last_sold_price'] }), {
       'Content-Type': 'application/json',
-    });
-    return Object.fromEntries(ids.map((id) => [id, parseConditionPrices(body && body[id])]));
+    })) || {};
+    return Object.fromEntries(lookups.map((l) => [l.id, { ...parseConditionPrices(body[l.raw]), psa10: parseGradedPrice(body[l.psa10]) }]));
   }
 
   /** The match's card-page slug, found by searching Pulse for "name number"; null if not found. */
   async function fetchSlug(match) {
     const body = await request('GET', `/api/v2/search/all?q=${encodeURIComponent(searchQueryFor(match))}&limit=10`);
-    const hit = ((body && body.items) || []).find((item) => item.productId === match.product_id);
+    const raw = withGrade(match.product_id, null, null);
+    const hit = ((body && body.items) || []).find((item) => item.productId === match.product_id || item.productId === raw);
     return hit ? hit.slug : null;
   }
 
@@ -317,17 +347,19 @@
       el('div', { fontSize: '11px', opacity: '0.75' }, describeMatch(match)),
     );
 
-    const grid = el('div', { display: 'grid', gridTemplateColumns: '26px 1fr auto', columnGap: '8px', rowGap: '1px', margin: '6px 0 2px', alignItems: 'baseline' });
+    const grid = el('div', { display: 'grid', gridTemplateColumns: 'auto 1fr auto', columnGap: '8px', rowGap: '1px', margin: '6px 0 2px', alignItems: 'baseline' });
     let anyLowData = false;
-    for (const c of CONDITIONS) {
-      const p = prices[c];
+    const addRow = (label, p) => {
       anyLowData = anyLowData || p.lowData;
       grid.append(
-        el('span', { fontSize: '11px', opacity: '0.7' }, c.toUpperCase()),
+        el('span', { fontSize: '11px', opacity: '0.7' }, label),
         el('span', { font: `600 13px/1.35 ${FONT}` }, p.value === null ? '-' : `${gbp(p.value)}${p.lowData ? ' *' : ''}`),
         el('span', { fontSize: '11px', opacity: '0.55' }, p.lastSold ? `sold ${p.lastSold}` : ''),
       );
-    }
+    };
+    for (const c of CONDITIONS) addRow(c.toUpperCase(), prices[c]);
+    grid.append(el('div', { gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.15)', margin: '3px 0 2px' }));
+    addRow('PSA 10', prices.psa10);
     box.append(grid);
     if (anyLowData) box.append(el('div', { fontSize: '11px', opacity: '0.6' }, '* few recent sales'));
 

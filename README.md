@@ -5,7 +5,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
-| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP comp prices |
+| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP and PSA 10 comp prices |
 
 ## Installing a script
 
@@ -46,7 +46,7 @@ On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in 
 
 1. Grabs the current video frame at full resolution.
 2. Sends it to Pulse's card scanner, the same one behind the scan page on pulsetcg.io.
-3. Fetches market prices for the matches and shows the top one: name, set, number, language and variant, then NM, LP, MP and HP prices with each one's last sale date. A `*` marks prices with few recent sales.
+3. Fetches market prices for the matches and shows the top one: name, set, number, language and variant, then NM, LP, MP and HP prices for the raw card and the PSA 10 price, each with its last sale date. A `*` marks prices with few recent sales.
 4. Adds an **Open on Pulse** link to the card's page, and lists other cards it found in the frame. Click one to switch to it.
 
 It uses your Pulse login, so sign in to pulsetcg.io in the same browser first. On the first scan Tampermonkey asks whether the script may connect to `pulsetcg.io`; choose **Always allow domain**.

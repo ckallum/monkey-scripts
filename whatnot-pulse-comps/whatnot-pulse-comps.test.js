@@ -1,7 +1,7 @@
 // Run with: npm test (from the repo root)
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { parseConditionPrices, variantOf, describeMatch, searchQueryFor } = require('./whatnot-pulse-comps.user.js');
+const { parseConditionPrices, parseGradedPrice, withGrade, variantOf, describeMatch, searchQueryFor } = require('./whatnot-pulse-comps.user.js');
 
 const FLYING_PIKACHU = 'card:unnumbered_jp|Unnumbered-02|null|CoroCoro 1997 (Flying)|null|null';
 
@@ -41,6 +41,24 @@ test('missing or unpriced products give empty rows instead of throwing', () => {
   assert.deepEqual(parseConditionPrices(undefined), expected);
   assert.deepEqual(parseConditionPrices([]), expected);
   assert.deepEqual(parseConditionPrices([{ type: 'market_price', value: null, conditionPricing: { nm: { value: null } } }]), expected);
+});
+
+test('reads a PSA 10 price from its market-data entries', () => {
+  // Trimmed from the real response for card:dptp_jp|043/DPt-P|null|null|PSA|10.
+  const entries = [
+    { type: 'market_price', value: '4567.78', condition: 'nm', low_availability: true, last_sold_price: 5086.7, last_sold_date: '2026-10-24T00:00:00.000Z' },
+    { type: 'last_sold_price', value: 5086.7 },
+  ];
+  assert.deepEqual(parseGradedPrice(entries), { value: 4567.78, lowData: true, lastSold: '2026-10-24' });
+  assert.deepEqual(parseGradedPrice(undefined), { value: null, lowData: false, lastSold: null });
+});
+
+test('swaps the grading fields of a product id', () => {
+  const raw = 'card:dptp_jp|043/DPt-P|null|null|null|null';
+  assert.equal(withGrade(raw, 'PSA', '10'), 'card:dptp_jp|043/DPt-P|null|null|PSA|10');
+  assert.equal(withGrade('card:dptp_jp|043/DPt-P|null|null|PSA|9', null, null), raw);
+  assert.equal(withGrade(FLYING_PIKACHU, 'PSA', '10'), 'card:unnumbered_jp|Unnumbered-02|null|CoroCoro 1997 (Flying)|PSA|10');
+  assert.equal(withGrade('card:short|1', 'PSA', '10'), 'card:short|1');
 });
 
 test('reads the variant from a product id', () => {
