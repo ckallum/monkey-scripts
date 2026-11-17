@@ -1,13 +1,13 @@
 // ==UserScript==
-// @name         Whatnot Pulse comps
+// @name         Whatnot Comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.4.1
+// @version      1.5.0
 // @description  Scan the card on a Whatnot stream with PulseTCG's scanner, or type it, and show its NM/LP/MP/HP, PSA 10/9/8 and ACE 10 comps, the last UK and US eBay sales, PSA population, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
 // @supportURL   https://github.com/ckallum/monkey-scripts/issues
-// @updateURL    https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-pulse-comps/whatnot-pulse-comps.user.js
-// @downloadURL  https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-pulse-comps/whatnot-pulse-comps.user.js
+// @updateURL    https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-comps/whatnot-comps.user.js
+// @downloadURL  https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-comps/whatnot-comps.user.js
 // @match        https://www.whatnot.com/*
 // @grant        GM_xmlhttpRequest
 // @grant        GM_getValue
@@ -20,7 +20,7 @@
 (function () {
   'use strict';
 
-  const LOG = '[whatnot-pulse-comps]';
+  const LOG = '[whatnot-comps]';
   const PULSE = 'https://pulsetcg.io';
   const PLAYER = '[data-testid="live-player"]';
   // Built from char codes so the source stays ASCII; a mis-encoded paste can't mangle them.

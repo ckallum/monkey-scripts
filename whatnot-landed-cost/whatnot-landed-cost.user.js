@@ -385,7 +385,7 @@
         wrap.style.alignSelf = anchor === est ? estCs.alignSelf : 'auto';
         anchor.after(wrap);
       }
-      // Read by whatnot-pulse-comps for its deal check.
+      // Read by whatnot-comps for its deal check.
       const postGbp = r.totalGbp.toFixed(2);
       if (wrap.dataset.wnlPostGbp !== postGbp) wrap.dataset.wnlPostGbp = postGbp;
       const pill = wrap.firstChild;

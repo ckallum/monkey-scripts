@@ -3,9 +3,9 @@
 This repo has two userscripts for watching Pokémon card streams on [whatnot.com](https://www.whatnot.com):
 
 - **Whatnot UK landed cost** puts a yellow "Post fees" badge under every yen price, showing what a UK buyer pays once shipping, import VAT, customs duty and the customs fee are added. It also adds a small yen calculator.
-- **Whatnot Pulse comps** adds a green "Comps" panel to live streams. Press Alt+P (Option+P on a Mac) to scan the card on screen, or type one such as `Dragonite 149 JP`. The panel shows PulseTCG prices by condition and grade, the latest UK and US eBay sales, and how the stream's price compares.
+- **Whatnot Comps** adds a green "Comps" panel to live streams. Press Alt+P (Option+P on a Mac) to scan the card on screen, or type one such as `Dragonite 149 JP`. The panel shows PulseTCG prices by condition and grade, the latest UK and US eBay sales, and how the stream's price compares.
 
-They work separately, so you can install either or both. Pulse comps uses the landed-cost badge for yen listings, so install both if you buy from Japanese sellers.
+They work separately, so you can install either or both. Whatnot Comps uses the landed-cost badge for yen listings, so install both if you buy from Japanese sellers.
 
 Both were built and tested in Chromium browsers (Chrome, Edge, Brave, Arc, Dia) on a desktop. They don't run in the Whatnot phone app.
 
@@ -35,7 +35,7 @@ Click a link below. Tampermonkey opens an install page showing the script's name
 | Script | Install link |
 |---|---|
 | Whatnot UK landed cost | [whatnot-landed-cost.user.js](https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-landed-cost/whatnot-landed-cost.user.js) |
-| Whatnot Pulse comps | [whatnot-pulse-comps.user.js](https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-pulse-comps/whatnot-pulse-comps.user.js) |
+| Whatnot Comps | [whatnot-comps.user.js](https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-comps/whatnot-comps.user.js) |
 
 If the link shows plain code instead of an install page, Tampermonkey isn't installed or is switched off. Go back to steps 1 and 2.
 
@@ -51,7 +51,7 @@ The estimate assumes you're a UK buyer. Pounds use Whatnot's own "est. £" excha
 
 Its Tampermonkey menu (click the Tampermonkey icon on a Whatnot page) can refresh the rates, change the customs fee, set a fallback shipping amount, change the commodity code, switch the £135 low-value rule, and reset the calculator's position.
 
-### Whatnot Pulse comps
+### Whatnot Comps
 
 You need a [PulseTCG](https://pulsetcg.io) account. Sign in at pulsetcg.io in the same browser: the script makes its requests with that login, the same way Pulse's own site does. If Tampermonkey asks whether the script may connect to `pulsetcg.io`, choose **Always allow domain**.
 
@@ -61,7 +61,7 @@ Each scan sends the current video frame to Pulse's card scanner, and Pulse may k
 
 Open any live Pokémon stream on Whatnot.
 
-- Pulse comps: a green **Comps** panel appears near the top left of the video. Click **Scan card** or press Alt+P.
+- Whatnot Comps: a green **Comps** panel appears near the top left of the video. Click **Scan card** or press Alt+P.
 - Landed cost: on a Japanese seller's stream, yellow **Post fees** badges appear under the yen prices, and a **Post fees calculator** box sits beside the video.
 
 You can drag both boxes by their headers. They remember where you put them.

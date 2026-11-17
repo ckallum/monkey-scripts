@@ -5,7 +5,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
-| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner, or looks up a typed card, and shows its NM/LP/MP/HP, PSA 10/9/8 and ACE 10 comps, the last UK and US eBay sales, PSA population, and a deal check against the stream price |
+| [whatnot-comps](whatnot-comps/whatnot-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner, or looks up a typed card, and shows its NM/LP/MP/HP, PSA 10/9/8 and ACE 10 comps, the last UK and US eBay sales, PSA population, and a deal check against the stream price |
 
 ## Installing
 
@@ -39,7 +39,7 @@ Items whose goods are worth £135 or less (shipping doesn't count towards this) 
 
 The Tampermonkey menu can refresh the rates, set the fee %, a fallback shipping amount for streams with no shipping chip, and the commodity code, toggle the £135 rule, and reset the calculator's position.
 
-## whatnot-pulse-comps
+## whatnot-comps
 
 On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Comps" panel. To skip the scan, type a card into the box below the button, such as `Dragonite 149 JP`, and press Enter. That runs Pulse's own search, which understands JP and set numbers, and the results go through the same steps from step 3 on.
 

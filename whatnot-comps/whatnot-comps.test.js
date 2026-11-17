@@ -17,7 +17,7 @@ const {
   searchQueryFor,
   parsePsaPop,
   searchItemToMatch,
-} = require('./whatnot-pulse-comps.user.js');
+} = require('./whatnot-comps.user.js');
 
 const FLYING_PIKACHU = 'card:unnumbered_jp|Unnumbered-02|null|CoroCoro 1997 (Flying)|null|null';
 
@@ -218,7 +218,7 @@ test('turns a Pulse search result into a match the panel can price', () => {
 });
 
 test('script source is pure ASCII, so a mis-encoded paste cannot mangle it', () => {
-  const source = require('node:fs').readFileSync(require.resolve('./whatnot-pulse-comps.user.js'), 'utf8');
+  const source = require('node:fs').readFileSync(require.resolve('./whatnot-comps.user.js'), 'utf8');
   const offending = source.split('\n').map((line, i) => [i + 1, line]).filter(([, line]) => /[^\x00-\x7F]/.test(line));
   assert.deepEqual(offending, []);
 });
