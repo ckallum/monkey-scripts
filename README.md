@@ -1,18 +1,17 @@
 # monkey-scripts
 
-Personal Tampermonkey userscripts. Each script lives in its own folder next to its tests.
+Personal Tampermonkey userscripts. Each script lives in its own folder next to its tests. To install them, follow [INSTALL.md](INSTALL.md).
 
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
 | [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and a deal check against the stream price |
 
-## Installing a script
+## Installing
 
-1. Open the script's raw file in a browser with Tampermonkey, for example [whatnot-landed-cost.user.js](https://raw.githubusercontent.com/ckallum/monkey-scripts/main/whatnot-landed-cost/whatnot-landed-cost.user.js). Tampermonkey shows an install page; click **Install**.
-2. In Chromium browsers, open `chrome://extensions`, then Tampermonkey's **Details**. Turn on **Allow User Scripts** and set **Site access** to **On all sites**. Without both, no script runs.
+[INSTALL.md](INSTALL.md) covers installing Tampermonkey, letting it run scripts, installing either script and fixing common problems.
 
-Tampermonkey then keeps the script updated: it checks the header's `@updateURL` (daily by default) and installs any higher `@version`. Pasting the file into **Create a new script** works too, and the pasted copy updates the same way as long as its header keeps the `@updateURL`.
+Tampermonkey keeps installed scripts updated: it checks the header's `@updateURL` (daily by default) and installs any higher `@version`. Pasting the file into **Create a new script** works too, and the pasted copy updates the same way as long as its header keeps the `@updateURL`.
 
 ## Tests
 
