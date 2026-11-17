@@ -5,7 +5,7 @@ Personal Tampermonkey userscripts. Each script lives in its own folder next to i
 | Script | Site | What it does |
 |---|---|---|
 | [whatnot-landed-cost](whatnot-landed-cost/whatnot-landed-cost.user.js) | whatnot.com | Adds the post-fees UK price (item + VAT + duty + customs fee) under every JPY price, plus a yen calculator box |
-| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner and shows its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and a deal check against the stream price |
+| [whatnot-pulse-comps](whatnot-pulse-comps/whatnot-pulse-comps.user.js) | whatnot.com | Scans the card on stream with PulseTCG's scanner, or looks up a typed card, and shows its NM/LP/MP/HP, PSA 10/9/8 and ACE 10 comps, the last UK and US eBay sales, PSA population, and a deal check against the stream price |
 
 ## Installing
 
@@ -41,16 +41,20 @@ The Tampermonkey menu can refresh the rates, set the fee %, a fallback shipping 
 
 ## whatnot-pulse-comps
 
-On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Comps" panel. The script:
+On a live stream, press **Alt+P** (Option+P on a Mac) or click **Scan card** in the green "Comps" panel. To skip the scan, type a card into the box below the button, such as `Dragonite 149 JP`, and press Enter. That runs Pulse's own search, which understands JP and set numbers, and the results go through the same steps from step 3 on.
+
+The script:
 
 1. Grabs the current video frame at full resolution.
 2. Sends it to Pulse's card scanner, the same one behind the scan page on pulsetcg.io.
-3. Shows the top match's name, set, number, language, variant and edition (such as 1st Edition), then a table with a row each for NM, LP, MP, HP and PSA 10:
+3. Shows the top match's name, set, number, language, variant and edition (such as 1st Edition), then a table with a row each for NM, LP, MP and HP, then PSA 10, PSA 9, PSA 8 and ACE 10:
    - **Pulse:** Pulse's market price and its last sale date. A `*` marks prices with few recent sales.
-   - **UK last** and **US last:** the most recent eBay sale in that grade on ebay.co.uk and ebay.com, with its date. Click one to open the sold listing.
-4. Runs a **deal check**: what the stream's current listing costs you against the Pulse price and the last UK and US sales, as an amount and a percentage under or over.
+   - **eBay UK** and **eBay US:** the most recent eBay sale in that grade on ebay.co.uk and ebay.com, with its date. Click one to find that sale on ebay.co.uk, US sales included: the link searches sold listings for the sale's exact title. The sale's own item page isn't used, because eBay often redirects an ended item to a page of live listings. ebay.co.uk converts US sales to pounds itself and appears to add UK VAT, so its figure can be higher than the panel's: a $1,895 Light Dragonite sale shows there as £1,724.56, against £1,414.30 in the panel.
+
+   Under the table, the card's PSA population and gem rate (the share graded 10), as Pulse records them. Pulse's counts can lag PSA's own.
+4. Runs a **deal check**: what the stream's current listing costs you against the Pulse price and the last eBay UK and eBay US sales, as an amount and a percentage under or over.
 5. Adds an **Open on Pulse** link to the card's page.
-6. Below that, two collapsed sections: **Recent eBay sales** lists the last 3 UK and 3 US sales for the chosen grade, and **Other matches** lists the scanner's other guesses (other cards in view, or other printings of the same card). Click a match to switch to it.
+6. Below that, two collapsed sections: **Recent eBay sales** lists the last 3 UK and 3 US sales for the chosen grade, and **Other matches** lists the scanner's other guesses (other cards in view, or other printings of the same card), or the other search results. Click a match to switch to it.
 
 Every price is in GBP. UK sales are already in pounds, and US sales use Pulse's own dollar-to-pound conversion.
 

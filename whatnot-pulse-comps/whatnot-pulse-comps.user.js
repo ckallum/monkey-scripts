@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Whatnot Pulse comps
 // @namespace    https://ckallum.com/userscripts
-// @version      1.2.4
-// @description  Scan the card on a Whatnot stream with PulseTCG's scanner and show its NM/LP/MP/HP and PSA 10 comps, the last UK and US eBay sales, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
+// @version      1.4.1
+// @description  Scan the card on a Whatnot stream with PulseTCG's scanner, or type it, and show its NM/LP/MP/HP, PSA 10/9/8 and ACE 10 comps, the last UK and US eBay sales, PSA population, and how the stream price compares, all in GBP. Needs you signed in to pulsetcg.io in the same browser.
 // @author       Callum Ke
 // @homepageURL  https://github.com/ckallum/monkey-scripts
 // @supportURL   https://github.com/ckallum/monkey-scripts/issues
@@ -30,11 +30,14 @@
   const ARROW_OPEN = String.fromCharCode(0x25be);
   const ARROW_CLOSED = String.fromCharCode(0x25b8);
   const CONDITIONS = ['nm', 'lp', 'mp', 'hp'];
-  const GRADES = [...CONDITIONS, 'psa10'];
-  const GRADE_LABELS = { nm: 'NM', lp: 'LP', mp: 'MP', hp: 'HP', psa10: 'PSA 10' };
+  // Slab grades priced alongside the raw card, as [grader, grade] in Pulse's product-id spelling.
+  const SLABS = { psa10: ['PSA', '10'], psa9: ['PSA', '9'], psa8: ['PSA', '8'], ace10: ['ACE', '10'] };
+  const GRADES = [...CONDITIONS, ...Object.keys(SLABS)];
+  const GRADE_LABELS = { nm: 'NM', lp: 'LP', mp: 'MP', hp: 'HP', psa10: 'PSA 10', psa9: 'PSA 9', psa8: 'PSA 8', ace10: 'ACE 10' };
   // Whatnot's condition line under the stream title. Damaged has no comp of its own, so it compares as HP.
   const LISTING_CONDITIONS = { 'near mint': 'nm', 'lightly played': 'lp', 'moderately played': 'mp', 'heavily played': 'hp', damaged: 'hp' };
   const MAX_MATCHES = 5; // the scanner returns every card in view, background ones included
+  const MAX_SEARCH_RESULTS = 8; // a typed search often returns several printings of one card
   const RECENT_SALES = 3; // per region, in the expanded list
   const PANEL_WIDTH = 300;
   const FONT = 'system-ui, -apple-system, sans-serif';
@@ -96,18 +99,21 @@
 
   /**
    * Sales from one /api/ebay-listings/<sold|sold-us>/<id>/recent response, newest first, in GBP.
-   * - Each sale: { grade: 'nm'|'lp'|'mp'|'hp'|'psa10'|null, gbp, date: 'YYYY-MM-DD'|null, type, title, url }.
+   * - Each sale: { grade, gbp, date: 'YYYY-MM-DD'|null, type, title, url }. grade is a raw condition ('nm'...'hp'),
+   *   a SLABS key ('psa10', 'psa9', 'psa8', 'ace10'), or null for anything else.
    * - UK sales are already in GBP; US sales use Pulse's own priceGbp conversion. Sales with no GBP price are dropped.
-   * - region: 'uk' or 'us', which picks the eBay site for the link.
+   * - url finds the sale on ebay.co.uk (see soldSearchUrl), for UK and US sales alike.
    */
-  function normalizeSales(body, region) {
+  function normalizeSales(body) {
     const sales = [];
     for (const l of (body && body.listings) || []) {
       const gbp = toPrice(l.currency === 'GBP' ? l.price : l.priceGbp);
       if (gbp === null) continue;
       let grade = null;
-      if (l.gradedBy) grade = String(l.gradedBy).toUpperCase() === 'PSA' && String(l.grade) === '10' ? 'psa10' : null;
-      else if (CONDITIONS.includes(String(l.condition || '').toLowerCase())) grade = String(l.condition).toLowerCase();
+      if (l.gradedBy) {
+        const slab = `${String(l.gradedBy).toLowerCase()}${String(l.grade)}`;
+        grade = SLABS[slab] ? slab : null;
+      } else if (CONDITIONS.includes(String(l.condition || '').toLowerCase())) grade = String(l.condition).toLowerCase();
       const id = String(l.ebayItemId || '');
       sales.push({
         grade,
@@ -115,22 +121,43 @@
         date: l.dateSold ? String(l.dateSold).slice(0, 10) : null,
         type: l.auctionType || '',
         title: l.title || '',
-        url: /^\d+$/.test(id) ? `https://www.ebay.${region === 'us' ? 'com' : 'co.uk'}/itm/${id}` : null,
+        url: soldSearchUrl(l.title, id),
       });
     }
     return sales.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
   }
 
   /**
+   * A link that finds one sale on ebay.co.uk.
+   * - Searches sold listings for the exact title in quotes, which lands on that sale; eBay falls back to
+   *   similar sales when the phrase doesn't match.
+   * - The item's own page isn't used: eBay often redirects an ended item to a catalogue page of live listings.
+   * - ebay.co.uk's default location includes US sellers, so US sales show there too.
+   */
+  function soldSearchUrl(title, itemId) {
+    const site = 'https://www.ebay.co.uk';
+    const phrase = String(title || '').replace(/"/g, '').trim();
+    if (phrase) return `${site}/sch/i.html?_nkw=${encodeURIComponent(`"${phrase}"`)}&LH_Sold=1&LH_Complete=1`;
+    return /^\d+$/.test(String(itemId || '')) ? `${site}/itm/${itemId}` : null;
+  }
+
+  /**
    * What the stream's listing is, from its title and Whatnot's condition line.
-   * - Returns 'psa10', a raw condition ('nm', 'lp', 'mp', 'hp'), 'graded' for any other slab, or null when unknown.
+   * - The condition line may be spelled out ("Near Mint") or a code ("NM").
+   * - Returns a SLABS key ('psa10', 'psa9', 'psa8', 'ace10'), a raw condition ('nm', 'lp', 'mp', 'hp'),
+   *   'graded' for any other slab, or null when unknown.
    */
   function listingGrade(title, conditionText) {
     const t = String(title || '');
-    if (/\bPSA\s*10\b/i.test(t)) return 'psa10';
+    // The lookahead keeps half grades ("PSA 8.5") from reading as whole ones.
+    const slab = t.match(/\b(PSA|ACE)\s*(10|9|8)(?![.\d])/i);
+    const slabKey = slab && `${slab[1].toLowerCase()}${slab[2]}`;
+    if (slabKey && SLABS[slabKey]) return slabKey;
     if (/\b(PSA|BGS|CGC|ACE|SGC|TAG)\s*\d/i.test(t)) return 'graded';
     const c = String(conditionText || '').trim().toLowerCase();
     for (const [name, grade] of Object.entries(LISTING_CONDITIONS)) if (c.startsWith(name)) return grade;
+    const code = c.match(/^(nm|lp|mp|hp|dmg)\b/);
+    if (code) return code[1] === 'dmg' ? 'hp' : code[1];
     return null;
   }
 
@@ -198,6 +225,23 @@
     return `${match.card_name || ''} ${match.card_number || ''}`.trim();
   }
 
+  /**
+   * PSA population from one /api/grade-population entry.
+   * - Returns { total, psa10, gemRate } with gemRate from 0 to 1, or null when Pulse has no PSA data.
+   */
+  function parsePsaPop(entry) {
+    const psa = entry && entry.graders && entry.graders.psa;
+    const total = psa ? Number(psa.totalPopulation) : NaN;
+    if (!(total > 0)) return null;
+    const psa10 = Number((psa.gradeData || {})['10']) || 0;
+    return { total, psa10, gemRate: psa10 / total };
+  }
+
+  /** A Pulse search result in the scanner's match shape: { product_id, card_name, set_name, card_number, language }. */
+  function searchItemToMatch(item) {
+    return { product_id: item.productId, card_name: item.name, set_name: item.setName, card_number: item.number, language: item.language };
+  }
+
   if (typeof module === 'object' && module.exports) {
     module.exports = {
       parseConditionPrices,
@@ -213,6 +257,8 @@
       editionOf,
       describeMatch,
       searchQueryFor,
+      parsePsaPop,
+      searchItemToMatch,
     };
     return;
   }
@@ -280,35 +326,54 @@
   }
 
   /**
-   * Raw condition prices plus the PSA 10 price for each match, in one request.
-   * - Returns { [match product id]: { nm, lp, mp, hp, psa10 } }.
+   * Raw condition prices, slab prices (SLABS) and PSA population for each match.
+   * - Returns { [match product id]: { nm, lp, mp, hp, psa10, psa9, psa8, ace10, pop } }; pop is null when Pulse has none.
    * - Priced from the raw card even when the scanner matched a slab.
+   * - A failed population lookup leaves pop null instead of failing the prices.
    */
   async function fetchPrices(ids) {
-    const lookups = ids.map((id) => ({ id, raw: withGrade(id, null, null), psa10: withGrade(id, 'PSA', '10') }));
-    const productIds = [...new Set(lookups.flatMap((l) => [l.raw, l.psa10]))];
-    const body = (await post('/api/internal/market-data', JSON.stringify({ productIds, metrics: ['market_price', 'last_sold_price'] }), {
-      'Content-Type': 'application/json',
-    })) || {};
-    return Object.fromEntries(lookups.map((l) => [l.id, { ...parseConditionPrices(body[l.raw]), psa10: parseGradedPrice(body[l.psa10]) }]));
+    const lookups = ids.map((id) => ({
+      id,
+      raw: withGrade(id, null, null),
+      slabs: Object.fromEntries(Object.entries(SLABS).map(([key, [grader, grade]]) => [key, withGrade(id, grader, grade)])),
+    }));
+    const productIds = [...new Set(lookups.flatMap((l) => [l.raw, ...Object.values(l.slabs)]))];
+    const raws = [...new Set(lookups.map((l) => l.raw))];
+    const json = { 'Content-Type': 'application/json' };
+    const [prices, pops] = await Promise.all([
+      post('/api/internal/market-data', JSON.stringify({ productIds, metrics: ['market_price', 'last_sold_price'] }), json),
+      post('/api/grade-population', JSON.stringify({ productIds: raws }), json).catch((err) => {
+        console.warn(LOG, 'population lookup failed', err);
+        return null;
+      }),
+    ]);
+    const body = prices || {};
+    const popBody = pops || {};
+    return Object.fromEntries(lookups.map((l) => [l.id, {
+      ...parseConditionPrices(body[l.raw]),
+      ...Object.fromEntries(Object.entries(l.slabs).map(([key, slabId]) => [key, parseGradedPrice(body[slabId])])),
+      pop: parsePsaPop(popBody[l.raw]),
+    }]));
   }
 
   /**
-   * Recent UK and US eBay sales of a match's raw card and its PSA 10, newest first, in GBP.
-   * - Returns { uk: sale[], us: sale[] } (see normalizeSales). Fails only if all four lookups fail.
+   * Recent UK and US eBay sales of a match's raw card and each SLABS grade, newest first, in GBP.
+   * - One lookup per product and site (10 in all), run together.
+   * - Returns { uk: sale[], us: sale[] } (see normalizeSales). Fails only if every lookup fails.
    */
   async function fetchSales(match) {
-    const raw = withGrade(match.product_id, null, null);
-    const psa10 = withGrade(match.product_id, 'PSA', '10');
+    const ids = [withGrade(match.product_id, null, null), ...Object.values(SLABS).map(([grader, grade]) => withGrade(match.product_id, grader, grade))];
     const get = (site, id) => request('GET', `/api/ebay-listings/${site}/${encodeURIComponent(id)}/recent`);
-    const results = await Promise.allSettled([get('sold', raw), get('sold', psa10), get('sold-us', raw), get('sold-us', psa10)]);
+    const lookups = [];
+    for (const [region, site] of [['uk', 'sold'], ['us', 'sold-us']]) for (const id of ids) lookups.push({ region, promise: get(site, id) });
+    const results = await Promise.allSettled(lookups.map((l) => l.promise));
     if (results.every((r) => r.status === 'rejected')) throw results[0].reason;
-    const [ukRaw, ukPsa, usRaw, usPsa] = results.map((r) => (r.status === 'fulfilled' ? r.value : null));
+    const sales = { uk: [], us: [] };
+    results.forEach((r, i) => {
+      if (r.status === 'fulfilled') sales[lookups[i].region].push(...normalizeSales(r.value));
+    });
     const newestFirst = (a, b) => (b.date || '').localeCompare(a.date || '');
-    return {
-      uk: [...normalizeSales(ukRaw, 'uk'), ...normalizeSales(ukPsa, 'uk')].sort(newestFirst),
-      us: [...normalizeSales(usRaw, 'us'), ...normalizeSales(usPsa, 'us')].sort(newestFirst),
-    };
+    return { uk: sales.uk.sort(newestFirst), us: sales.us.sort(newestFirst) };
   }
 
   /** The match's card-page slug, found by searching Pulse for "name number"; null if not found. */
@@ -317,6 +382,15 @@
     const raw = withGrade(match.product_id, null, null);
     const hit = ((body && body.items) || []).find((item) => item.productId === match.product_id || item.productId === raw);
     return hit ? hit.slug : null;
+  }
+
+  /** Pulse's own search for typed text such as "Dragonite 149 JP"; resolves to [{ match, slug }], best first. */
+  async function searchCards(text) {
+    const body = await request('GET', `/api/v2/search/all?q=${encodeURIComponent(text)}&limit=10`);
+    return ((body && body.items) || [])
+      .filter((item) => String(item.productId || '').startsWith('card:'))
+      .slice(0, MAX_SEARCH_RESULTS)
+      .map((item) => ({ match: searchItemToMatch(item), slug: item.slug || null }));
   }
 
   // ---------- Formatting ----------
@@ -404,8 +478,8 @@
 
   // ---------- Panel ----------
 
-  const ui = { root: null, body: null, button: null, status: null, result: null, placed: false };
-  let state = null; // { matches, prices, slugs, sales, selected, gradeChosen }
+  const ui = { root: null, body: null, button: null, search: null, go: null, status: null, result: null, deal: null, dealGrade: null, placed: false };
+  let state = null; // { matches, prices, slugs, sales, selected, gradeChosen, source: 'scan'|'search' }
   let listing = null; // readListing() as last rendered
   let listingKey = '';
   let busy = false;
@@ -468,14 +542,39 @@
       cursor: 'pointer',
     }, 'Scan card  (Alt+P)');
     button.type = 'button';
+    const searchRow = el('div', { display: 'flex', gap: '4px', marginTop: '5px' });
+    const search = el('input', {
+      flex: '1',
+      minWidth: '0',
+      padding: '4px 6px',
+      border: '1px solid rgba(255,255,255,0.2)',
+      borderRadius: '6px',
+      background: '#0d0d0d',
+      color: '#fff',
+      font: `12px/1.3 ${FONT}`,
+      outline: 'none',
+    });
+    search.type = 'text';
+    search.placeholder = 'Or type a card, e.g. Dragonite 149 JP';
+    search.spellcheck = false;
+    search.autocomplete = 'off';
+    const go = el('button', { padding: '4px 8px', border: `1px solid ${GREEN}`, borderRadius: '6px', background: 'none', color: GREEN, font: `600 12px/1.3 ${FONT}`, cursor: 'pointer' }, 'Search');
+    go.type = 'button';
+    searchRow.append(search, go);
     const status = el('div', { fontSize: '11px', opacity: '0.75', marginTop: '5px', minHeight: '14px' });
     const result = el('div');
-    body.append(button, status, result);
+    body.append(button, searchRow, status, result);
     root.append(header, body);
     document.body.appendChild(root);
-    Object.assign(ui, { root, body, button, status, result });
+    Object.assign(ui, { root, body, button, search, go, status, result });
 
-    button.addEventListener('click', runScan);
+    button.addEventListener('click', () => runScan());
+    go.addEventListener('click', () => runSearch());
+    // Keep typing in the box away from Whatnot's own keyboard handlers.
+    for (const type of ['keydown', 'keyup', 'keypress']) search.addEventListener(type, (e) => e.stopPropagation());
+    search.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') runSearch();
+    });
 
     const setCollapsed = (collapsed) => {
       body.style.display = collapsed ? 'none' : 'block';
@@ -554,7 +653,7 @@
       node.target = '_blank';
       node.rel = 'noopener';
     }
-    node.title = [sale.title, `${sale.type || 'Sold'} on ${sale.date}`].filter(Boolean).join('\n');
+    node.title = [sale.title, `${sale.type || 'Sold'} on ${sale.date}`, 'Opens this sale on ebay.co.uk'].filter(Boolean).join('\n');
     return node;
   }
 
@@ -585,9 +684,9 @@
   function priceGrid(prices, sales, grade) {
     // Cells stretch to the row's height so the selected row's highlight is one even band.
     const grid = el('div', { display: 'grid', gridTemplateColumns: 'auto 1fr 1fr 1fr', margin: '6px 0 2px', alignItems: 'stretch' });
-    for (const head of ['', 'Pulse', 'UK last', 'US last']) grid.append(el('span', { ...SECTION_HEAD, ...CELL, marginBottom: '0' }, head));
+    for (const head of ['', 'Pulse', 'eBay UK', 'eBay US']) grid.append(el('span', { ...SECTION_HEAD, ...CELL, marginBottom: '0' }, head));
     for (const g of GRADES) {
-      if (g === 'psa10') grid.append(el('div', { gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.15)', margin: '2px 0' }));
+      if (g === GRADES[CONDITIONS.length]) grid.append(el('div', { gridColumn: '1 / -1', borderTop: '1px solid rgba(255,255,255,0.15)', margin: '2px 0' }));
       const selected = g === grade;
       const rowStyle = selected ? { background: 'rgba(52,211,153,0.14)' } : {};
       const label = el('div', { ...CELL, ...rowStyle, fontSize: '11px', fontWeight: selected ? '700' : '400', color: selected ? GREEN : '', whiteSpace: 'nowrap' }, GRADE_LABELS[g]);
@@ -604,6 +703,16 @@
     return grid;
   }
 
+  /** "PSA pop 2,470 . 1,626 PSA 10s (66% gem rate)", or an empty line when Pulse has no PSA data. */
+  function popLine(pop) {
+    const line = el('div', { fontSize: '11px', opacity: '0.75', margin: '2px 0 1px' });
+    if (!pop) return line;
+    const n = (v) => v.toLocaleString('en-GB');
+    line.textContent = `PSA pop ${n(pop.total)} ${DOT} ${n(pop.psa10)} PSA 10s (${Math.round(pop.gemRate * 100)}% gem rate)`;
+    line.title = `PSA population as Pulse records it, which can lag PSA's own counts`;
+    return line;
+  }
+
   function dealSection(prices, sales, grade) {
     const wrap = el('div', SECTION);
     wrap.append(el('div', SECTION_HEAD, `Deal check ${DOT} ${GRADE_LABELS[grade]}`));
@@ -612,7 +721,7 @@
       return wrap;
     }
     if (listing.grade === 'graded' && !state.gradeChosen) {
-      wrap.append(el('div', MUTED, 'The listing is a slab other than PSA 10. Click a row to compare.'));
+      wrap.append(el('div', MUTED, 'The listing is a slab without a row here. Click a row to compare.'));
       return wrap;
     }
     const grid = el('div', { display: 'grid', gridTemplateColumns: 'auto auto 1fr', columnGap: '8px', rowGap: '1px', alignItems: 'baseline' });
@@ -620,7 +729,7 @@
     grid.append(el('span', MUTED, 'Stream'), el('span', PRICE, gbp(listing.cost)), el('span', MUTED, listing.basis));
     const uk = lastSale(sales, 'uk', grade);
     const us = lastSale(sales, 'us', grade);
-    for (const [label, comp] of [['vs Pulse', prices[grade].value], ['vs UK last', uk && uk.gbp], ['vs US last', us && us.gbp]]) {
+    for (const [label, comp] of [['vs Pulse', prices[grade].value], ['vs eBay UK', uk && uk.gbp], ['vs eBay US', us && us.gbp]]) {
       const c = compare(listing.cost, comp);
       const verdict = c ? `${gbp(c.amount)} ${c.under ? 'under' : 'over'} (${Math.round(c.pct)}%)` : '';
       grid.append(
@@ -692,9 +801,12 @@
       el('div', { font: `600 14px/1.3 ${FONT}`, marginTop: '6px' }, match.card_name),
       el('div', MUTED, describeMatch(match)),
       priceGrid(prices, sales, grade),
-      el('div', { ...MUTED, fontSize: '10px' }, `All GBP ${DOT} UK/US: last eBay sale ${DOT} * few recent sales ${DOT} click a row to compare`),
-      dealSection(prices, sales, grade),
+      popLine(prices.pop),
+      el('div', { ...MUTED, fontSize: '10px' }, `All GBP ${DOT} eBay: last sold ${DOT} * few recent sales ${DOT} click a row to compare`),
     );
+    ui.deal = dealSection(prices, sales, grade);
+    ui.dealGrade = grade;
+    box.append(ui.deal);
 
     const slug = state.slugs[match.product_id];
     if (slug) {
@@ -708,11 +820,12 @@
     box.append(recentSalesSection(sales, grade));
 
     if (state.matches.length > 1) {
+      const hint = state.source === 'search' ? 'Other Pulse search results' : 'Other cards in view, or other printings of this one';
       const { toggle, open } = sectionToggle('matchesOpen', `Other matches (${state.matches.length - 1})`);
-      toggle.title = 'Other cards in view, or other printings of this one';
+      toggle.title = hint;
       box.append(el('div', { marginTop: '4px' }), toggle);
       if (!open) return;
-      box.append(el('div', { ...MUTED, marginBottom: '3px' }, 'Other cards in view, or other printings of this one'));
+      box.append(el('div', { ...MUTED, marginBottom: '3px' }, hint));
       state.matches.forEach((other, i) => {
         if (i === state.selected) return;
         const nm = state.prices[other.product_id].nm.value;
@@ -744,6 +857,23 @@
     }
   }
 
+  /**
+   * Redraw the deal check for a new stream price.
+   * - Only the deal section is replaced while the compared grade stays the same, so a click on the
+   *   table or the toggles isn't lost to a redraw mid-auction.
+   */
+  function refreshDeal() {
+    const grade = selectedGrade();
+    if (!ui.deal || !ui.deal.isConnected || grade !== ui.dealGrade) {
+      render();
+      return;
+    }
+    const match = state.matches[state.selected];
+    const fresh = dealSection(state.prices[match.product_id], state.sales[match.product_id], grade);
+    ui.deal.replaceWith(fresh);
+    ui.deal = fresh;
+  }
+
   function messageFor(err) {
     if (err.status === 401) return 'Sign in to pulsetcg.io in this browser, then try again.';
     if (err.status === 403) return 'Pulse refused the request (403). Open pulsetcg.io once, then retry.';
@@ -769,48 +899,81 @@
       });
   }
 
-  async function runScan() {
+  /** Run one lookup at a time, with the buttons disabled and any error shown in the status line. */
+  async function exclusive(task) {
     if (busy || !ui.root) return;
     busy = true;
-    ui.button.disabled = true;
-    ui.button.style.opacity = '0.6';
-    setStatus('Scanning...');
+    for (const b of [ui.button, ui.go]) {
+      b.disabled = true;
+      b.style.opacity = '0.6';
+    }
     try {
-      const frame = await grabFrame();
-      const matches = await scanFrame(frame);
-      if (!matches.length) {
-        state = null;
-        render();
-        setStatus('No card recognised. Wait for a clear view of one card and try again.', true);
-        return;
-      }
-      setStatus('Fetching prices...');
-      const prices = await fetchPrices(matches.map((m) => m.product_id));
-      listing = readListing();
-      listingKey = JSON.stringify(listing);
-      state = { matches, prices, slugs: {}, sales: {}, selected: 0, gradeChosen: null };
-      loadSales(matches[0]);
-      render();
-      setStatus(`Scanned at ${new Date().toLocaleTimeString('en-GB')}`);
-      const current = state;
-      for (const m of matches) {
-        fetchSlug(m)
-          .then((slug) => {
-            if (slug && state === current) {
-              current.slugs[m.product_id] = slug;
-              render();
-            }
-          })
-          .catch(() => {});
-      }
+      await task();
     } catch (err) {
       console.warn(LOG, err);
       setStatus(messageFor(err), true);
     } finally {
       busy = false;
-      ui.button.disabled = false;
-      ui.button.style.opacity = '1';
+      for (const b of [ui.button, ui.go]) {
+        b.disabled = false;
+        b.style.opacity = '1';
+      }
     }
+  }
+
+  /**
+   * Price a list of matches and show the first.
+   * - slugs: card-page slugs already known (search results carry them); the rest are looked up.
+   * - source: 'scan' or 'search', which words the other-matches hint.
+   */
+  async function showMatches(matches, slugs, source, doneText) {
+    setStatus('Fetching prices...');
+    const prices = await fetchPrices(matches.map((m) => m.product_id));
+    listing = readListing();
+    listingKey = JSON.stringify(listing);
+    state = { matches, prices, slugs: { ...slugs }, sales: {}, selected: 0, gradeChosen: null, source };
+    loadSales(matches[0]);
+    render();
+    setStatus(`${doneText} at ${new Date().toLocaleTimeString('en-GB')}`);
+    const current = state;
+    for (const m of matches) {
+      if (current.slugs[m.product_id]) continue;
+      fetchSlug(m)
+        .then((slug) => {
+          if (slug && state === current) {
+            current.slugs[m.product_id] = slug;
+            render();
+          }
+        })
+        .catch(() => {});
+    }
+  }
+
+  function clearResult(message) {
+    state = null;
+    render();
+    setStatus(message, true);
+  }
+
+  function runScan() {
+    return exclusive(async () => {
+      setStatus('Scanning...');
+      const matches = await scanFrame(await grabFrame());
+      if (!matches.length) return clearResult('No card recognised. Wait for a clear view of one card and try again.');
+      return showMatches(matches, {}, 'scan', 'Scanned');
+    });
+  }
+
+  function runSearch() {
+    const text = ui.search.value.trim();
+    if (!text) return undefined;
+    return exclusive(async () => {
+      setStatus('Searching...');
+      const results = await searchCards(text);
+      if (!results.length) return clearResult(`No Pulse cards match "${text}".`);
+      const slugs = Object.fromEntries(results.filter((r) => r.slug).map((r) => [r.match.product_id, r.slug]));
+      return showMatches(results.map((r) => r.match), slugs, 'search', `Searched "${text}"`);
+    });
   }
 
   // ---------- Start ----------
@@ -842,7 +1005,7 @@
       if (key !== listingKey) {
         listing = next;
         listingKey = key;
-        render();
+        refreshDeal();
       }
     }
   }, 1000);
